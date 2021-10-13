@@ -1,56 +1,76 @@
 import numpy as np
-from spextra import Spextrum, Passband
+
 import astropy.units as u
+from astropy.table import Table
 
-#set_target.emission_line()
-#set_target.template()
-#set_target.black_body()
+from spextra import Spextrum, Passband
+
+from .utils import *
+
+"""
+Expected usage:
+
+initialize
+target = SetTarget(magnitude=15, filter_curve="R", redshift=1)
+
+target.template(template_name="kc96/s0")  # defines the spectra, default a vega spectrum
+terget.sersic(parameters) # defines a spatial distribution  # default point source 
+
+target.get_source # get the source
+
+"""
 
 
-class Set_Target:
+SED_dict = dict(template=template,
+                MARCS=MARCS,
+                emission_line=emission_line,
+                black_body=black_body,
+                powerlaw=powerlaw,
+                uniform=flat_spec)
 
-    def __init__(self, redshift=0, magnitude=20, filter_curve="V", filter_system="Vega"):
-        self.redshift = redshift
-        self.filter_system = filter_system
-        if self.filter_system == "Vega"
-            mag_unit = u.mag
-        else:
-            mag_unit = u.ABmag
+FLUX_DISTRO_dict = dict(sersic=sersic,
+                        point_source=point_source,
+                        uniform=uniform_flux)
 
-        self.magnitude = magnitude * mag_unit
-        self.filter_curve = filter_curve
+
+
+class ETC:
+
+    def __init__(self, mode="imaging", pixel_size=0.004, ao_mode="SCAO"):
+
+        self.mode = mode
+        self.pixel_size = pixel_size
+        self.ao_mode = ao_mode
 
         self.spectrum = None
-        self.spatial = None
+        self.source = None
+        self.sky = None
 
-    def template(self, template_name='pickles/a0v'):
-        sp = Spextrum(template_name=template_name).redshift(self.redshift)
-        self.spectrum = sp.scale_to_magnitude(amplitude=self.magnitude, filter_curve=self.filter_curve)
+    def set_instrument(self):
+        """
+        Reset instrument and perform checks
 
-    def MARCS(self):
-#        self.spectrum = MARCS spectrum
+        """
+        pass
 
-    def emission_line(self, center, fwhm, flux):
+    def set_sed(self, spectrum_type, **kwargs):
+        if spectrum_type not in SED_dict.keys():
+            raise ValueError("SED not available")
 
-        sp = Spextrum.emission_line_spectra(center=center, fwhm=fwhm, flux=flux)
-        self.spectrum = sp
+        self.spectrum = SED_dict[spectrum_type](**kwargs)
 
-    def black_body(self, temperature):
-        sp = Spextrum.black_body_spectrum(temperature=temperature, amplitude=self.magnitude, filter_curve=self.filter_curve)
+    def set_target_flux_distribution(self, distribution, **kwargs):
+        if distribution not in FLUX_DISTRO_dict.keys():
+            raise ValueError("FLUX distribution not availalbe")
 
-        self.spectrum = sp
+        self.source = FLUX_DISTRO_dict[distribution](self.spectrum, **kwargs)
 
-    def powerlaw(self, alpha):
-        sp = Spextrum.powerlaw(alpha=alpha)
+    def set_sky_conditions(self):
+        """
+        TODO: Check how ScopeSim can read this
+        :return:
+        """
 
-    def sersic(self):
-        self.spatial = "sersic"
-
-    def set_template(self):
-        source = "source"
-        return source
-
-
-
+        self.sky = None
 
 
