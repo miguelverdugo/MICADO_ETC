@@ -1,7 +1,7 @@
 import numpy as np
 
 import astropy.units as u
-from astropy.table import Table
+
 
 from spextra import Spextrum, Passband
 

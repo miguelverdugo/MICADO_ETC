@@ -1,9 +1,8 @@
 from spextra import Spextrum
 from scopesim_templates.basic.galaxy import galaxy
+from scopesim_templates.basic.stars import star
 from scopesim import Source
-
-
-
+from astropy.table import Table
 
 
 def template(template_name='pickles/a0v', magnitude=20, filter_curve="V", redshift=0):
@@ -11,8 +10,25 @@ def template(template_name='pickles/a0v', magnitude=20, filter_curve="V", redshi
     return sp.scale_to_magnitude(amplitude=magnitude, filter_curve=filter_curve)
 
 
-def MARCS(self):
-    #  self.spectrum = MARCS spectrum
+def from_file(filename, magnitude, filter_name, redshift):
+
+    sp = Spextrum.from_file(filename=filename)
+    sp = sp.redshift(z=redshift).scale_to_magnitude(amplitude=magnitude, filter_curve=filter_name)
+    return sp
+
+
+def MARCS():
+    """
+    TODO: Implement in spextra
+    Parameters
+    ----------
+    self
+
+    Returns
+    -------
+
+    """
+
     return NotImplementedError
 
 
@@ -32,19 +48,26 @@ def powerlaw(alpha, magnitude, filter_curve):
 
 
 def flat_spec(magnitude):
-        sp = Spextrum.flat_spectrum(amplitude=magnitude)
-        return sp
+    sp = Spextrum.flat_spectrum(amplitude=magnitude)
+    return sp
 
 
-def point_source():
-    pass
+def point_source(magnitude, sed, filter_name, redshift=0):
+    sp = Spextrum(sed).redshift(z=redshift).scale_to_magnitude(amplitude=magnitude, filter_curve=filter_name)
+    tbl = Table(names=["x", "y", "ref", "weight", "spec_types"],
+                data=[[0], [0], [0], [1], [sed]])
+
+    src = Source(spectra=[sp], table=tbl)
+    # src.meta.update()
+
+    return src
 
 
-def sersic(sed, redshift, magnitude, filter_curve, r_eff, n, ellip=0.1, theta=0, extend=3):
+def sersic(magnitude, sed, filter_name,  redshift, r_eff, n, ellip=0.1, theta=0, extend=3):
     src = galaxy(sed=sed,
                  z=redshift,
                  amplitude=magnitude,
-                 filter_curve=filter_curve,
+                 filter_curve=filter_name,
                  pixel_scale=0.0015,  # !!!!
                  r_eff=r_eff,
                  n=n,
