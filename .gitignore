@@ -14,15 +14,13 @@ __pycache__/*
 */.ipynb_checkpoints/*
 /docs/notebooks/.ipynb_checkpoints/*
 
-# MV: some possible extensions of data files
+
 # Goal data is not upload to github, only the yaml files
-/database/**/*.fits
-/database/**/*.tfits
-/database/**/*.dat
-/database/**/*.ascii
-/database/**/*.sed
-/database/**/*.txt
-/database/**/*.vo
+/docs/notebooks/*.zip
+/docs/notebooks/Armazones/*
+/docs/notebooks/ELT/*
+/docs/notebooks/MAORY/*
+/docs/notebooks/MICADO/*
 
 # Project files
 .ropeproject
