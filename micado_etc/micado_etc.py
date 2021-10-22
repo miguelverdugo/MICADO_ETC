@@ -41,12 +41,14 @@ FLUX_DISTRO_dict = dict(sersic=sersic,
 
 class ETC:
 
-    def __init__(self, mode="imaging", pixel_size=0.004, ao_mode="SCAO"):
+    def __init__(self, mode="imaging", pixel_size=0.004, ao_mode="SCAO", target_separation=0):
 
         self.mode = mode
         self.pixel_size = pixel_size
         self.ao_mode = ao_mode
-        self.set_instrument(mode=self.mode, pixel_size=self.pixel_size, ao_mode=self.ao_mode)
+        self.target_separation = target_separation
+        self.set_instrument(mode=self.mode, pixel_size=self.pixel_size,
+                            ao_mode=self.ao_mode, target_separation=self.target_separation)
 
         # This could be used to read dictionaries directly from a yml file or a interactively
         self.spectrum = None
@@ -55,7 +57,7 @@ class ETC:
         self.setup = None
         self.ao_params = None
 
-    def set_instrument(self, mode, pixel_size, ao_mode):
+    def set_instrument(self, mode, pixel_size, ao_mode, target_separation):
         """
         Reset instrument and perform checks
 
@@ -70,10 +72,13 @@ class ETC:
             raise ValueError
         if mode.lower() == "spectroscopy" and ao_mode.lower() == "mcao":
             raise ValueError
+        if target_separation > np.sqrt(2*25**2):   # Only important for SCAO
+            raise ValueError
 
         self.mode = mode
         self.pixel_size = pixel_size
         self.ao_mode = ao_mode
+        self.target_separation = target_separation
 
 
     def set_sed(self, spectrum_type, **kwargs):
@@ -88,8 +93,6 @@ class ETC:
         -------
 
         """
-
-
         if spectrum_type not in SED_dict.keys():
             raise ValueError("SED not available")
 
@@ -124,9 +127,23 @@ class ETC:
     def _get_source(self):
         src_func = FLUX_DISTRO_dict[self.source["distro_name"]]
         params = self.source["params"]
+
         src = src_func(self._get_spectrum(),
                        **params)
+
+        src.shift(dx=dist, dy=dist)
+
         return src
+
+    def set_ao(self):
+        pass
+
+    def _get_scao_psf(self):
+        dist = np.sqrt(0.5 * self.target_separation ** 2)
+        psf = scao_psf(x=dist, y=dist)
+
+        return psf
+
 
     def set_sky_conditions(self, airmass=1.5, moon_phase=0.5, pwv=10):
         """
@@ -139,6 +156,13 @@ class ETC:
     def set_ao(self, distance, turbulence, iq):
 
         self.ao_params = dict(disntance=distance, turbulence=turbulence, iq=iq)
+
+    def _get_psf(self):
+        kernel = scao_psf()
+        psf_effect = sim.effects.psfs.PSF()
+        psf_effect.kernel = kernel
+
+        return psf_effect
 
     def set_setup_obs(self, dit=60, ndit=1, filter_name="Ks"):
 
@@ -156,6 +180,7 @@ class ETC:
         """
 
         src = self._get_source()
+        psf_effect = self._get_psf()
 
         micado = sim.OpticalTrain("MICADO")
         micado.cmds["!OBS.filter_name"] = self.filter_name  # observing filter
@@ -165,8 +190,12 @@ class ETC:
         micado['detector_linearity'].include = False
         micado.cmds["!OBS.dit"] = self.setup_obs["dit"]  # dit & ndit
         micado.cmds["!OBS.ndit"] = self.setup_obs["ndit"]
+        micado["relay_psf"].include = False
+        micado.optics_manager["default_ro"].add_effect(psf_effect)
+
         micado.observe(src)
         micado.cmds["!OBS.modes"] = ['SCAO', 'IMG_1.5mas']
+
         hdus = micado.readout(filename=filename)
 
 

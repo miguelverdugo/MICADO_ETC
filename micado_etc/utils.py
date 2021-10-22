@@ -3,7 +3,7 @@ from scopesim_templates.basic.galaxy import galaxy
 from scopesim_templates.basic.stars import star
 from scopesim import Source
 from astropy.table import Table
-
+from anisocado import AnalyticalScaoPsf
 
 def template(template_name='pickles/a0v', magnitude=20, filter_curve="V", redshift=0):
     sp = Spextrum(template_name=template_name).redshift(redshift)
@@ -63,7 +63,7 @@ def point_source(magnitude, sed, filter_name, redshift=0):
     return src
 
 
-def sersic(magnitude, sed, filter_name,  redshift, r_eff, n, ellip=0.1, theta=0, extend=3):
+def sersic(magnitude, sed, filter_name,  redshift, r_eff, n, ellip=0.1, theta=0, extend=3, x=0, y=0):
     src = galaxy(sed=sed,
                  z=redshift,
                  amplitude=magnitude,
@@ -79,3 +79,14 @@ def sersic(magnitude, sed, filter_name,  redshift, r_eff, n, ellip=0.1, theta=0,
 
 def uniform_flux():
     pass
+
+
+def scao_psf(wavelength=2.15, profile_name="EsoMedian", x=0, y=0):
+    psf = AnalyticalScaoPsf(N=512, wavelength=wavelength, profile_name=profile_name)
+    if x == 0 and y == 0:
+        kernel = psf.psf_on_axis
+    else:
+        kernel = psf.shift_off_axis(x, y)
+
+    return kernel
+
