@@ -1,6 +1,7 @@
 from spextra import Spextrum
-from scopesim_templates.basic.galaxy import galaxy
-from scopesim_templates.basic.stars import star
+from scopesim_templates.exgal import galaxy
+
+#from scopesim_templates.basic.stars import star
 from scopesim import Source
 from astropy.table import Table
 from anisocado import AnalyticalScaoPsf
@@ -81,12 +82,18 @@ def uniform_flux():
     pass
 
 
-def scao_psf(wavelength=2.15, profile_name="EsoMedian", x=0, y=0):
-    psf = AnalyticalScaoPsf(N=512, wavelength=wavelength, profile_name=profile_name)
-    if x == 0 and y == 0:
-        kernel = psf.psf_on_axis
-    else:
-        kernel = psf.shift_off_axis(x, y)
+def scao_psf(wavelength=2.15, profile_name="EsoQ4", zenDist=0, seeing=1, x=0, y=0):
+    psf = AnalyticalScaoPsf(N=512, wavelength=wavelength, profile_name=profile_name,
+                            zenDist=zenDist, seeing=seeing)
+    kernel = psf.shift_off_axis(x, y)
 
     return kernel
+
+
+def mcao_psf(wavelength=2.15, profile_name="EsoQ4", zenDist=0, seeing=1, x=0, y=0):
+    kernel = psf.shift_off_axis(x, y)
+
+    return kernel
+
+
 

@@ -21,6 +21,7 @@ __pycache__/*
 /docs/notebooks/ELT/*
 /docs/notebooks/MAORY/*
 /docs/notebooks/MICADO/*
+/docs/notebooks/inst_pkgs/*
 
 # Project files
 .ropeproject
