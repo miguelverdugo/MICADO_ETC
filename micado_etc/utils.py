@@ -1,10 +1,15 @@
 from spextra import Spextrum
-from scopesim_templates.exgal import galaxy
+
+try:
+    from scopesim_templates.extragalactic.galaxies import galaxy
+except ImportError:
+    from scopesim_templates.basic.galaxy import galaxy
 
 #from scopesim_templates.basic.stars import star
 from scopesim import Source
 from astropy.table import Table
 from anisocado import AnalyticalScaoPsf
+
 
 def template(template_name='pickles/a0v', magnitude=20, filter_curve="V", redshift=0):
     sp = Spextrum(template_name=template_name).redshift(redshift)
@@ -53,8 +58,14 @@ def flat_spec(magnitude):
     return sp
 
 
-def point_source(magnitude, sed, filter_name, redshift=0):
-    sp = Spextrum(sed).redshift(z=redshift).scale_to_magnitude(amplitude=magnitude, filter_curve=filter_name)
+def point_source(sed, magnitude, filter_name, redshift=0):
+    if isinstance(sed, Spextrum):
+        sp1 = sed.redshift(z=redshift)
+        sp = sp1.scale_to_magnitude(amplitude=magnitude, filter_curve=filter_name)
+
+    else:
+        sp = Spextrum(sed).redshift(z=redshift).scale_to_magnitude(amplitude=magnitude, filter_curve=filter_name)
+
     tbl = Table(names=["x", "y", "ref", "weight", "spec_types"],
                 data=[[0], [0], [0], [1], [sed]])
 

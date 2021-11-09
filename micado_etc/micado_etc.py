@@ -13,12 +13,10 @@ from .utils import *
 Expected usage:
 
 initialize
-target = SetTarget(magnitude=15, filter_curve="R", redshift=1)
 
-target.template(template_name="kc96/s0")  # defines the spectra, default a vega spectrum
-terget.sersic(parameters) # defines a spatial distribution  # default point source 
+etc = ETC()
 
-target.get_source # get the source
+
 
 """
 sim.server.database.download_package(["locations/Armazones.zip",
@@ -58,7 +56,7 @@ class ETC:
         self.source = None
         self.sky = None
         self.setup = None
-        self.ao_params = self.set_ao()
+        self.set_ao()
 
     def set_instrument(self, mode, pixel_size, ao_mode, target_separation, dx, dy):
         """
@@ -138,10 +136,14 @@ class ETC:
         src_func = FLUX_DISTRO_dict[self.source["distro_name"]]
         params = self.source["params"]
 
-        src = src_func(self._get_spectrum(),
-                       **params)
-        src.shift(dx=dist,
-                  dy=dist)
+        params.update({"sed": self._get_spectrum(),
+                       "filter_name": self.spectrum["params"]["filter_curve"],
+                       "magnitude": self.spectrum["params"]["magnitude"]
+                       })
+
+        src = src_func(**params)
+        src.shift(dx=self.dx,
+                  dy=self.dy)
 
         return src
 
@@ -155,10 +157,10 @@ class ETC:
                         moon_phase=moon_phase,
                         pwv=pwv)
 
-    def set_ao(self, profile_name="EsoQ4", zen_dist=0, seeing=1):
+    def set_ao(self, profile_name="EsoQ4", zenDist=0, seeing=1):
 
         self.ao_params = dict(profile_name=profile_name,
-                              zen_dist=zen_dist,
+                              zenDist=zenDist,
                               #turbulence=turbulence,
                               #iq=iq,
                               seeing=seeing)
@@ -197,11 +199,11 @@ class ETC:
         psf_effect = self._get_psf()
 
         micado = sim.OpticalTrain("MICADO")
-        micado.cmds["!OBS.filter_name"] = self.filter_name  # observing filter
+        micado.cmds["!OBS.filter_name"] = self.setup["filter_name"]  # observing filter
         micado.cmds["!INST.pixel_scale"] = self.pixel_size
         micado.cmds["!OBS.modes"] = [self.ao_mode.upper(), self.image_mode]
-        micado.cmds["!OBS.dit"] = self.setup_obs["dit"]  # dit & ndit
-        micado.cmds["!OBS.ndit"] = self.setup_obs["ndit"]
+        micado.cmds["!OBS.dit"] = self.setup["dit"]  # dit & ndit
+        micado.cmds["!OBS.ndit"] = self.setup["ndit"]
         micado["armazones_atmo_skycalc_ter_curve"].include = True
         micado["armazones_atmo_default_ter_curve"].include = False
         micado['detector_linearity'].include = False
@@ -209,15 +211,14 @@ class ETC:
         micado["relay_psf"].include = False
         micado.optics_manager["default_ro"].add_effect(psf_effect)
 
-
         micado.observe(src)
-        noisless_image = micado.image_planes[0].data
+        noiseless_image = micado.image_planes[0].data
 
         hdus = micado.readout(filename=filename)
 
         observed_image = hdus[0][1]
 
-        return noisless_image, observed_image
+        return noiseless_image, observed_image
 
 
 
