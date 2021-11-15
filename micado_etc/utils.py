@@ -5,11 +5,12 @@ try:
 except ImportError:
     from scopesim_templates.basic.galaxy import galaxy
 
+#from scopesim_templates.basic.basic import empty_sky
 #from scopesim_templates.basic.stars import star
 from scopesim import Source
 from astropy.table import Table
 from anisocado import AnalyticalScaoPsf
-
+import numpy as np
 
 def template(template_name='pickles/a0v', magnitude=20, filter_curve="V", redshift=0):
     sp = Spextrum(template_name=template_name).redshift(redshift)
@@ -87,6 +88,26 @@ def sersic(magnitude, sed, filter_name,  redshift, r_eff, n, ellip=0.1, theta=0,
                  theta=theta,
                  extend=extend)
     return src
+
+
+def empty_sky():
+    """
+    Returns an empty source so that instrumental fluxes can be simulated
+
+    Returns
+    -------
+    sky : Source
+
+    """
+   # params = {"function_call": function_call_str(empty_sky, {}),
+   #           "object": "empty sky"}
+
+    sky = Source(lam=np.array([0.7, 2.5]),
+                 spectra=np.array([0, 0]), x=[0], y=[0], ref=[0], weight=[0])
+  #  sky.meta.update(params)
+
+    return sky
+
 
 
 def uniform_flux():

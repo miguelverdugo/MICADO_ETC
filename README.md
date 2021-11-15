@@ -11,7 +11,7 @@ proper calculations of S/N, etc.
 The proposed usage is the following
 
 ```python
-from micado_etc import ETC
+from etc import MICADO_ETC
 
 etc = ETC("instrument configuration")
 etc.set_sed("sed selection and settings")

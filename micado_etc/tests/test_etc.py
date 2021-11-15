@@ -6,7 +6,7 @@ import numpy as np
 import astropy.units as u
 from spextra import Spextrum
 
-from ..micado_etc import ETC
+from ..etc import ETC
 
 
 class TestETCBasic:
