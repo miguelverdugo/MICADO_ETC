@@ -1,3 +1,4 @@
+
 import numpy as np
 
 import astropy.units as u
@@ -20,10 +21,6 @@ etc = ETC()
 
 
 """
-sim.server.database.download_package(["locations/Armazones.zip",
-                                      "telescopes/ELT.zip",
-                                      "instruments/MAORY.zip",
-                                      "instruments/MICADO.zip"])
 
 SED_dict = dict(template=template,
                 MARCS=MARCS,
@@ -38,6 +35,9 @@ FLUX_DISTRO_dict = dict(sersic=sersic,
 
 
 
+
+
+
 #class ETC:
 #    common class for setting parameters
 #class ETC_HAWKI(ETC)
@@ -47,14 +47,18 @@ FLUX_DISTRO_dict = dict(sersic=sersic,
 
 
 class ETC_base:
-    def __init__(self, mode, pixel_size, ao_mode=None, target_separation=0):
+    def __init__(self, mode, pixel_size, ao_mode=None, target_separation=0, dx=0, dy=0):
 
         self.mode = mode
         self.pixel_size = pixel_size
         self.ao_mode = ao_mode
         self.target_separation = target_separation
+        self.dx = dx
+        self.dy = dy
 
+        self.sed_type = None
         self.sed_params = None
+        self.source = None
         self.source_params = None
         self.ao_params = None
         self.sky_params = None
@@ -72,10 +76,17 @@ class ETC_base:
         -------
 
         """
+
         if spectrum_type not in SED_dict.keys():
             raise ValueError("SED not available")
+        else:
+            func = SED_dict[spectrum_type]
+            func_params = dict(kwargs)
 
-        self.sed_params = dict(spec_name=spectrum_type, params=kwargs)
+        check_func_params(func, func_params)
+        print(spectrum_type, func_params)
+        self.sed_type = spectrum_type
+        self.sed_params = func_params
 
     def set_target_flux_distribution(self, distribution, **kwargs):
         """
@@ -91,10 +102,14 @@ class ETC_base:
         """
         if distribution not in FLUX_DISTRO_dict.keys():
             raise ValueError("FLUX distribution not availalbe")
-        if self.spectrum is None:
-            raise ValueError("Please define the SED first")
+        else:
+            func = FLUX_DISTRO_dict[distribution]
+            func_params = dict(kwargs)
 
-        self.source_params = dict(distro_name=distribution, params=kwargs)
+        check_func_params(func, func_params)
+
+        self.source = func
+        self.source_params = func_params
 
     def set_sky_conditions(self, airmass=1.5, moon_phase=0.5, pwv=10):
         """
@@ -118,20 +133,25 @@ class ETC_base:
 
         self.obs_params = dict(dit=dit, ndit=ndit, filter_name=filter_name)
 
-    def _get_spectrum(self):
-        sed_func = SED_dict[self.spectrum["spec_name"]]
-        params = self.spectrum["params"]
+    def _get_sed(self):
+        try:
+            sed_func = SED_dict[self.sed_type]
+        except KeyError as error:
+            print("sed type %s unknown" % error)
+            raise
+
+        params = self.sed_params
         sp = sed_func(**params)
 
         return sp
 
     def _get_source(self):
         src_func = FLUX_DISTRO_dict[self.source["distro_name"]]
-        params = self.source["params"]
+        params = self.source_params
 
-        params.update({"sed": self._get_spectrum(),
-                       "filter_name": self.spectrum["params"]["filter_curve"],
-                       "magnitude": self.spectrum["params"]["magnitude"]
+        params.update({"sed": self._get_sed(),
+                       "filter_name": self.sed_params["filter_curve"],
+                       "magnitude": self.sed_params["magnitude"]
                        })
 
         src = src_func(**params)
@@ -143,6 +163,10 @@ class ETC_base:
 
 class HAWKI_ETC(ETC_base):
 
+    sim.server.database.download_package(["locations/Armazones.zip",
+                                          "telescopes/ELT.zip",
+                                          "instruments/HAWKI.zip"])
+
     def __init__(self, mode="imaging", pixel_size=0.106, ao_mode="no_ao" ):
 
         super(HAWKI_ETC, self).__init__(mode=mode, pixel_size=pixel_size, ao_mode=ao_mode)
@@ -152,7 +176,15 @@ class HAWKI_ETC(ETC_base):
     def set_instrument(self, ao_mode):   # This is very instrument specific
         if ao_mode.lower() not in ["no_ao", "ao"]:
             raise ValueError
+        else:
+            self.ao_mode = ao_mode
 
+    def _get_psf(self):
+        psf_effect = None
+
+        return psf_effect
+
+    def run(self):
 
 
 
@@ -160,6 +192,11 @@ class HAWKI_ETC(ETC_base):
 
 
 class MICADO_ETC(ETC_base):
+
+    sim.server.database.download_package(["locations/Armazones.zip",
+                                          "telescopes/ELT.zip",
+                                          "instruments/MAORY.zip",
+                                          "instruments/MICADO.zip"])
 
     def __init__(self, mode="imaging", pixel_size=0.004, ao_mode="SCAO", target_separation=0, dx=0, dy=0):
 
@@ -283,4 +320,10 @@ class MICADO_ETC(ETC_base):
 
 
 
+class METIS_ETC(ETC_base):
 
+
+    def __init__(self, mode, pixel_size=0.004, ao_mode="scao"):
+        
+        super(METIS_ETC, self).__init__(mode=mode, pixel_size=pixel_size, ao_mode=ao_mode)
+ 

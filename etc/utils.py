@@ -1,3 +1,6 @@
+import inspect
+
+
 from spextra import Spextrum
 
 try:
@@ -11,6 +14,14 @@ from scopesim import Source
 from astropy.table import Table
 from anisocado import AnalyticalScaoPsf
 import numpy as np
+
+
+def check_func_params(func, params):
+
+    if tuple(params) != tuple(inspect.signature(func).parameters):
+        raise TypeError #("Missing parameters:", inspect.signature(func).parameters)
+# SEDs
+
 
 def template(template_name='pickles/a0v', magnitude=20, filter_curve="V", redshift=0):
     sp = Spextrum(template_name=template_name).redshift(redshift)
@@ -39,24 +50,27 @@ def MARCS():
     return NotImplementedError
 
 
-def emission_line(center, fwhm, flux):
+def emission_line(center=9000, fwhm=2, flux=1e-16):
     sp = Spextrum.emission_line_spectra(center=center, fwhm=fwhm, flux=flux)
     return sp
 
 
-def black_body(temperature, magnitude, filter_curve):
+def black_body(temperature=5000, magnitude=15, filter_curve="Ks"):
     sp = Spextrum.black_body_spectrum(temperature=temperature, amplitude=magnitude, filter_curve=filter_curve)
     return sp
 
 
-def powerlaw(alpha, magnitude, filter_curve):
+def powerlaw(alpha=1, magnitude=15, filter_curve="Ks"):
     sp = Spextrum.powerlaw(alpha=alpha, amplitude=magnitude, filter_curve=filter_curve)
     return sp
 
 
-def flat_spec(magnitude):
+def flat_spec(magnitude=15):
     sp = Spextrum.flat_spectrum(amplitude=magnitude)
     return sp
+
+
+# Sources
 
 
 def point_source(sed, magnitude, filter_name, redshift=0):
