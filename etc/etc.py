@@ -45,7 +45,6 @@ FLUX_DISTRO_dict = dict(sersic=sersic,
 #class ETC_METIS(ETC)
 
 
-
 class ETC_base:
     def __init__(self, mode, pixel_size, ao_mode=None, target_separation=0, dx=0, dy=0):
 
@@ -83,10 +82,9 @@ class ETC_base:
             func = SED_dict[spectrum_type]
             func_params = dict(kwargs)
 
-        check_func_params(func, func_params)
-        print(spectrum_type, func_params)
         self.sed_type = spectrum_type
-        self.sed_params = func_params
+        self.sed_params = check_func_params(func, func_params)
+        print("Spectrum type: '%s' with parameters %s" % (self.sed_type, self.sed_params))
 
     def set_target_flux_distribution(self, distribution, **kwargs):
         """
@@ -101,32 +99,37 @@ class ETC_base:
 
         """
         if distribution not in FLUX_DISTRO_dict.keys():
-            raise ValueError("FLUX distribution not availalbe")
+            raise ValueError("FLUX distribution not available")
         else:
             func = FLUX_DISTRO_dict[distribution]
             func_params = dict(kwargs)
 
-        check_func_params(func, func_params)
+        self.source = distribution
+        self.source_params = check_func_params(func, func_params)
+        self.source_params.update(dict(filter_name=self.sed_params["filter_curve"],
+                                       magnitude=self.sed_params["magnitude"],
+                                       redshift=self.sed_params["redshift"]))
+        print("Source '%s' with parameters %s" % (self.source, self.source_params))
 
-        self.source = func
-        self.source_params = func_params
-
-    def set_sky_conditions(self, airmass=1.5, moon_phase=0.5, pwv=10):
+    def set_sky_conditions(self, airmass=1.5, moon_phase=0.5, pwv=10, turbulence=100, iq=0.8):
         """
         TODO: Check how ScopeSim can read this
         TODO: turbulence and iq affect the PSF!
         """
 
         self.sky_params = dict(airmass=airmass,
-                        moon_phase=moon_phase,
-                        pwv=pwv)
+                               moon_phase=moon_phase,
+                               pwv=pwv,
+                               turbulence=turbulence,
+                               iq=iq)
 
-    def set_ao(self, profile_name="EsoQ4", zenDist=0, seeing=1):
+    def set_ao(self, profile_name="EsoQ4", zenDist=0, seeing=0.8):
+        """
+        TODO: Conditions here are redundant with self.set_sky_conditions()
+        """
 
         self.ao_params = dict(profile_name=profile_name,
                               zenDist=zenDist,
-                              #turbulence=turbulence,
-                              #iq=iq,
                               seeing=seeing)
 
     def set_setup_obs(self, dit=60, ndit=1, filter_name="Ks"):
@@ -149,9 +152,7 @@ class ETC_base:
         src_func = FLUX_DISTRO_dict[self.source["distro_name"]]
         params = self.source_params
 
-        params.update({"sed": self._get_sed(),
-                       "filter_name": self.sed_params["filter_curve"],
-                       "magnitude": self.sed_params["magnitude"]
+        params.update({"sed": self._get_sed()
                        })
 
         src = src_func(**params)
@@ -163,8 +164,8 @@ class ETC_base:
 
 class HAWKI_ETC(ETC_base):
 
-    sim.server.database.download_package(["locations/Armazones.zip",
-                                          "telescopes/ELT.zip",
+    sim.server.database.download_package(["locations/Paranal.zip",
+                                          "telescopes/VLT.zip",
                                           "instruments/HAWKI.zip"])
 
     def __init__(self, mode="imaging", pixel_size=0.106, ao_mode="no_ao" ):
@@ -173,22 +174,42 @@ class HAWKI_ETC(ETC_base):
 
         self.set_instrument()
 
-    def set_instrument(self, ao_mode):   # This is very instrument specific
+    def set_instrument(self, ao_mode, seeing=0.8):   # This is very instrument specific
         if ao_mode.lower() not in ["no_ao", "ao"]:
             raise ValueError
         else:
             self.ao_mode = ao_mode
 
+
     def _get_psf(self):
-        psf_effect = None
+        psf_effect = sim.effects.psfs.SeeingPSF(fwhm=self.sky_params["iq"])
 
         return psf_effect
 
-    def run(self):
+    def run(self, filename):
 
+        src = self._get_source()
+        psf_effect = self._get_psf()
 
+        hawki = sim.OpticalTrain("HAWKI")
+        hawki.cmds["!OBS.filter_name"] = self.setup["filter_name"]  # observing filter
+        hawki.cmds["!INST.pixel_scale"] = self.pixel_size
+        hawki.cmds["!OBS.modes"] = [self.ao_mode.upper(), self.image_mode]
+        hawki.cmds["!OBS.dit"] = self.setup["dit"]  # dit & ndit
+        hawki.cmds["!OBS.ndit"] = self.setup["ndit"]
+        hawki["armazones_atmo_skycalc_ter_curve"].include = True
+        hawki["armazones_atmo_default_ter_curve"].include = False
+        hawki['detector_linearity'].include = False
+        hawki.cmds["!DET.y"] = self.dy / self.pixel_size
+        hawki.cmds["!DET.x"] = self.dx / self.pixel_size
+        hawki["relay_psf"].include = False
+        hawki.optics_manager["default_ro"].add_effect(psf_effect)
 
-
+        hawki.observe(src)
+        noiseless_obj = hawki.image_planes[0].data
+        #    signal_to_noise = np.sqrt(noiseless_image)
+        hdu_obj = hawki.readout(filename=filename)
+        observed_image = hdu_obj[0][1]
 
 
 class MICADO_ETC(ETC_base):
@@ -263,7 +284,7 @@ class MICADO_ETC(ETC_base):
             kernel = scao_psf(**kwargs)
             psf_effect = sim.effects.psfs.PSF()
             psf_effect.kernel = kernel
-        else:
+        else:  # MCAO
             filename = sim.utils.find_file("PSF_MCAO_ConstPSF_40_18_6.fits")
             psf_effect = sim.effects.psfs.FieldConstantPSF(filename=filename)
 
@@ -326,4 +347,3 @@ class METIS_ETC(ETC_base):
     def __init__(self, mode, pixel_size=0.004, ao_mode="scao"):
         
         super(METIS_ETC, self).__init__(mode=mode, pixel_size=pixel_size, ao_mode=ao_mode)
- 

@@ -7,6 +7,18 @@ import astropy.units as u
 from spextra import Spextrum
 
 from ..etc import ETC_base
+from ..utils import eval_func_params
+
+
+def test_eval_func_params():
+    def little_function(a=1, b=2, c=3):
+        return a + b + c
+
+    params = dict(a=10, b=20, d=60)
+    result = eval_func_params(little_function, params)
+
+    assert result == 60
+
 
 
 
@@ -35,8 +47,14 @@ class TestETCBasic:
 
     def test_get_sed(self):
         etc = ETC_base(mode="imaging", pixel_size=0.1)
-        etc.set_sed("template", template_name="kc96/s0")
+        etc.set_sed("template", template_name="kc96/s0", magnitude=15, filter_curve="V", redshift=0)
         print(etc.sed_type, etc.sed_params)
         assert isinstance(etc._get_sed(), Spextrum)
+
+
+    def test_get_source(self):
+        etc = ETC_base(mode="imaging", pixel_size=0.1)
+        etc.set_sed("template", template_name="kc96/s0")
+        etc.set_target_flux_distribution("point_source")
 
 

@@ -1,27 +1,42 @@
 import inspect
+import warnings
 
+import numpy as np
+from astropy.table import Table
 
 from spextra import Spextrum
 
-try:
-    from scopesim_templates.extragalactic.galaxies import galaxy
-except ImportError:
-    from scopesim_templates.basic.galaxy import galaxy
 
 #from scopesim_templates.basic.basic import empty_sky
 #from scopesim_templates.basic.stars import star
 from scopesim import Source
-from astropy.table import Table
 from anisocado import AnalyticalScaoPsf
-import numpy as np
+try:  # temporal holder because conflict versions.
+    from scopesim_templates.extragalactic.galaxies import galaxy
+except ImportError:
+    from scopesim_templates.basic.galaxy import galaxy
 
 
 def check_func_params(func, params):
+    """
+    Small function to check for the parameters before evaluating.
+    """
+    args = inspect.getfullargspec(func).args
+    defaults = inspect.getfullargspec(func).defaults
+    func_params = dict(zip(args, defaults))
 
-    if tuple(params) != tuple(inspect.signature(func).parameters):
-        raise TypeError #("Missing parameters:", inspect.signature(func).parameters)
+    for k in params.keys():
+        if k not in func_params.keys():
+            warnings.warn("Parameter %s not part of function %s parameters" % (k, func.__name__),
+                          stacklevel=2)
+        else:
+            func_params[k] = params[k]
+
+    return func_params
+
+
+
 # SEDs
-
 
 def template(template_name='pickles/a0v', magnitude=20, filter_curve="V", redshift=0):
     sp = Spextrum(template_name=template_name).redshift(redshift)
@@ -73,7 +88,7 @@ def flat_spec(magnitude=15):
 # Sources
 
 
-def point_source(sed, magnitude, filter_name, redshift=0):
+def point_source(sed="pickles/a0v", magnitude=15, filter_name="V", redshift=0):
     if isinstance(sed, Spextrum):
         sp1 = sed.redshift(z=redshift)
         sp = sp1.scale_to_magnitude(amplitude=magnitude, filter_curve=filter_name)
@@ -90,7 +105,7 @@ def point_source(sed, magnitude, filter_name, redshift=0):
     return src
 
 
-def sersic(magnitude, sed, filter_name,  redshift, r_eff, n, ellip=0.1, theta=0, extend=3, x=0, y=0):
+def sersic(sed, magnitude=15, filter_name="V",  redshift=0, r_eff=5, n=4, ellip=0.1, theta=0, extend=3, x=0, y=0):
     src = galaxy(sed=sed,
                  z=redshift,
                  amplitude=magnitude,
@@ -123,20 +138,16 @@ def empty_sky():
     return sky
 
 
-
 def uniform_flux():
     pass
+
+
+
 
 
 def scao_psf(wavelength=2.15, profile_name="EsoQ4", zenDist=0, seeing=1, x=0, y=0):
     psf = AnalyticalScaoPsf(N=512, wavelength=wavelength, profile_name=profile_name,
                             zenDist=zenDist, seeing=seeing)
-    kernel = psf.shift_off_axis(x, y)
-
-    return kernel
-
-
-def mcao_psf(wavelength=2.15, profile_name="EsoQ4", zenDist=0, seeing=1, x=0, y=0):
     kernel = psf.shift_off_axis(x, y)
 
     return kernel
