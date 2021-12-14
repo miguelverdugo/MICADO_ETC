@@ -86,7 +86,7 @@ class ETC_base:
         self.sed_params = check_func_params(func, func_params)
         print("Spectrum type: '%s' with parameters %s" % (self.sed_type, self.sed_params))
 
-    def set_target_flux_distribution(self, distribution, **kwargs):
+    def set_source(self, distribution, **kwargs):
         """
         Same here
         Parameters
@@ -122,6 +122,7 @@ class ETC_base:
                                pwv=pwv,
                                turbulence=turbulence,
                                iq=iq)
+        print("Sky parameters:", self.sky_params)
 
     def set_ao(self, profile_name="EsoQ4", zenDist=0, seeing=0.8):
         """
@@ -135,6 +136,7 @@ class ETC_base:
     def set_setup_obs(self, dit=60, ndit=1, filter_name="Ks"):
 
         self.obs_params = dict(dit=dit, ndit=ndit, filter_name=filter_name)
+        print("Observing parameters:", self.obs_params)
 
     def _get_sed(self):
         try:
@@ -149,7 +151,7 @@ class ETC_base:
         return sp
 
     def _get_source(self):
-        src_func = FLUX_DISTRO_dict[self.source["distro_name"]]
+        src_func = FLUX_DISTRO_dict[self.source]
         params = self.source_params
 
         params.update({"sed": self._get_sed()
@@ -158,8 +160,19 @@ class ETC_base:
         src = src_func(**params)
         src.shift(dx=self.dx,
                   dy=self.dy)
-
         return src
+
+    def _get_sky_conditions(self):
+
+        skycalc_dict  = {"!ATMO.pwv": self.sky_params["pwv"],
+                         "!ATMO.airmass": self.sky_params["airmass"],
+                         "!ATMO.moon_sun_sep": self.sky_params["moon_phase"],
+                         "!ATMO.wmax": 300000
+                         }
+        return skycalc_dict
+
+
+
 
 
 class HAWKI_ETC(ETC_base):
@@ -168,42 +181,44 @@ class HAWKI_ETC(ETC_base):
                                           "telescopes/VLT.zip",
                                           "instruments/HAWKI.zip"])
 
-    def __init__(self, mode="imaging", pixel_size=0.106, ao_mode="no_ao" ):
+    def __init__(self, mode="imaging", pixel_size=0.106, ao_mode="no_ao"):
 
         super(HAWKI_ETC, self).__init__(mode=mode, pixel_size=pixel_size, ao_mode=ao_mode)
 
         self.set_instrument()
 
-    def set_instrument(self, ao_mode, seeing=0.8):   # This is very instrument specific
-        if ao_mode.lower() not in ["no_ao", "ao"]:
+    def set_instrument(self):   # This is very instrument specific
+        if self.ao_mode.lower() not in ["no_ao", "ao"]:
             raise ValueError
-        else:
-            self.ao_mode = ao_mode
-
 
     def _get_psf(self):
         psf_effect = sim.effects.psfs.SeeingPSF(fwhm=self.sky_params["iq"])
 
         return psf_effect
 
-    def run(self, filename):
+    def run(self, filename=None):
 
         src = self._get_source()
         psf_effect = self._get_psf()
 
         hawki = sim.OpticalTrain("HAWKI")
-        hawki.cmds["!OBS.filter_name"] = self.setup["filter_name"]  # observing filter
+        hawki.cmds["!OBS.filter_name"] = self.obs_params["filter_name"]  # observing filter
         hawki.cmds["!INST.pixel_scale"] = self.pixel_size
-        hawki.cmds["!OBS.modes"] = [self.ao_mode.upper(), self.image_mode]
-        hawki.cmds["!OBS.dit"] = self.setup["dit"]  # dit & ndit
-        hawki.cmds["!OBS.ndit"] = self.setup["ndit"]
-        hawki["armazones_atmo_skycalc_ter_curve"].include = True
-        hawki["armazones_atmo_default_ter_curve"].include = False
+        hawki.cmds["!OBS.modes"] = [self.ao_mode.upper(), self.mode]
+
+        hawki["paranal_atmo_skycalc_ter_curve"].include = True
+        hawki["paranal_atmo_default_ter_curve"].include = False
         hawki['detector_linearity'].include = False
+        hawki.effects["vlt_generic_psf"] = psf_effect
         hawki.cmds["!DET.y"] = self.dy / self.pixel_size
         hawki.cmds["!DET.x"] = self.dx / self.pixel_size
-        hawki["relay_psf"].include = False
-        hawki.optics_manager["default_ro"].add_effect(psf_effect)
+        hawki.cmds["!ATMO.pwv"] = self.sky_params["pwv"]
+        hawki.cmds["!ATMO.moon_sun_sep"] = self.sky_params["moon_phase"]
+        hawki.cmds["!ATMO.airmass"] = self.sky_params["airmass"]
+   #     hawki["relay_psf"].include = False
+        print(hawki.effects)
+   #     hawki.optics_manager["default_ro"].add_effect(psf_effect)
+
 
         hawki.observe(src)
         noiseless_obj = hawki.image_planes[0].data
