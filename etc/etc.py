@@ -84,7 +84,7 @@ class ETC_base:
 
         self.sed_type = spectrum_type
         self.sed_params = check_func_params(func, func_params)
-        print("Spectrum type: '%s' with parameters %s" % (self.sed_type, self.sed_params))
+        print("SED: '%s' with parameters %s" % (self.sed_type, self.sed_params))
 
     def set_source(self, distribution, **kwargs):
         """
@@ -133,6 +133,9 @@ class ETC_base:
                               zenDist=zenDist,
                               seeing=seeing)
 
+        print("AO parameters:", self.ao_params)
+
+
     def set_setup_obs(self, dit=60, ndit=1, filter_name="Ks"):
 
         self.obs_params = dict(dit=dit, ndit=ndit, filter_name=filter_name)
@@ -173,13 +176,11 @@ class ETC_base:
 
 
 
-
-
 class HAWKI_ETC(ETC_base):
 
-    sim.server.database.download_package(["locations/Paranal.zip",
-                                          "telescopes/VLT.zip",
-                                          "instruments/HAWKI.zip"])
+   # sim.server.database.download_package(["locations/Paranal.zip", # TODO: Yaml files have some problems, update irdb
+   #                                       "telescopes/VLT.zip",
+   #                                       "instruments/HAWKI.zip"])
 
     def __init__(self, mode="imaging", pixel_size=0.106, ao_mode="no_ao"):
 
@@ -200,21 +201,31 @@ class HAWKI_ETC(ETC_base):
 
         src = self._get_source()
         psf_effect = self._get_psf()
+        cmd = sim.UserCommands(use_instrument="HAWKI")
 
-        hawki = sim.OpticalTrain("HAWKI")
-        hawki.cmds["!OBS.filter_name"] = self.obs_params["filter_name"]  # observing filter
-        hawki.cmds["!INST.pixel_scale"] = self.pixel_size
-        hawki.cmds["!OBS.modes"] = [self.ao_mode.upper(), self.mode]
+
+        cmd["!OBS.filter_name"] = self.obs_params["filter_name"]  # observing filter
+        cmd["!INST.pixel_scale"] = self.pixel_size
+        cmd["!OBS.modes"] = [self.ao_mode.upper(), self.mode]
+
+        cmd["!DET.y"] = self.dy / self.pixel_size
+        cmd["!DET.x"] = self.dx / self.pixel_size
+        cmd["!ATMO.pwv"] = self.sky_params["pwv"]
+        cmd["!ATMO.moon_sun_sep"] = self.sky_params["moon_phase"]
+        cmd["!ATMO.airmass"] = self.sky_params["airmass"]
+       # cmd[!SIM.spectral.spectral_bin]
+        print(cmd)
+
+        hawki = sim.OpticalTrain(cmd)
 
         hawki["paranal_atmo_skycalc_ter_curve"].include = True
         hawki["paranal_atmo_default_ter_curve"].include = False
         hawki['detector_linearity'].include = False
         hawki.effects["vlt_generic_psf"] = psf_effect
-        hawki.cmds["!DET.y"] = self.dy / self.pixel_size
-        hawki.cmds["!DET.x"] = self.dx / self.pixel_size
-        hawki.cmds["!ATMO.pwv"] = self.sky_params["pwv"]
-        hawki.cmds["!ATMO.moon_sun_sep"] = self.sky_params["moon_phase"]
-        hawki.cmds["!ATMO.airmass"] = self.sky_params["airmass"]
+
+
+
+
    #     hawki["relay_psf"].include = False
         print(hawki.effects)
    #     hawki.optics_manager["default_ro"].add_effect(psf_effect)
